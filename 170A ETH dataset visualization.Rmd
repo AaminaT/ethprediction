@@ -1,0 +1,147 @@
+---
+title: "170A ETH dataset visualization"
+author: "Hailey Chung"
+date: "2025-02-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(nycflights13)
+library(gapminder)
+library(Lahman)
+library(rmarkdown)
+library(dplyr)
+library(tinytex)
+library(ggplot2)
+library(ggpubr)
+library(hexbin)
+library(lubridate)
+library(stringr)
+library(car)
+library(dplyr)
+library(nlme)
+library(lme4)
+library(sqldf)
+library(DBI)
+library(RMySQL)
+library(RSQLite)
+options(sqldf.driver = "SQLite")
+library("readr")
+library("bayesplot")
+library("rstanarm")
+library("scales")
+library("zoo")
+
+```
+
+```{r read eth-usd data,echo=TRUE}
+eth_usd_data <- read.csv("C:\\Users\\haile\\Downloads\\ETH-USD.csv")
+eth_usd_data
+```
+
+
+```{r pressure, echo=TRUE}
+names(eth_usd_data)[names(eth_usd_data) == "Adj.Close"] <- "Adj_Close"
+
+str(eth_usd_data)
+eth_usd_data$Date <- as.Date(eth_usd_data$Date)
+eth_usd_data$Open <- as.numeric(eth_usd_data$Open)
+eth_usd_data$High <- as.numeric(eth_usd_data$High)
+eth_usd_data$Low <- as.numeric(eth_usd_data$Low)
+eth_usd_data$Close <- as.numeric(eth_usd_data$Close)
+eth_usd_data$Adj_Close <- as.numeric(eth_usd_data$Adj_Close)
+eth_usd_data$Volume <- as.numeric(eth_usd_data$Volume)
+
+
+# remove incomplet erows
+eth_usd_data <- eth_usd_data[complete.cases(eth_usd_data[c("Open", "High", "Low", "Close", "Adj_Close","Volume")]), ]
+
+print("Number of rows after cleaning:")
+print(nrow(eth_usd_data))
+
+```
+
+
+```{r}
+#    Daily close price history
+price_plot <- ggplot(eth_usd_data, aes(x = Date)) +
+  geom_line(aes(y = Close), color = "#3498db", size = 0.8) +
+  labs(title = "Ethereum Price History",
+       subtitle = "Daily closing prices (USD)",
+       x = "Date",
+       y = "Price (USD)") +
+  theme_minimal() +
+  scale_y_continuous(labels = scales::comma) +
+  theme(plot.title = element_text(face = "bold", size = 14),
+        plot.subtitle = element_text(size = 10))
+print(price_plot)
+
+
+
+
+
+# Log-scaled price chart
+log_plot <- ggplot(eth_usd_data, aes(x = Date, y = Close)) +
+  geom_line(color = "#2980b9", size = 0.8) +
+  scale_y_log10(labels = comma) +
+  labs(title = "Ethereum Price History  (Log Scale)",
+       x = "Date",
+       y = "Price (USD) - Log Scale") +
+  theme_minimal()
+print(log_plot)
+
+
+
+# volatility of daily price - (High - Low) for each day
+eth_usd_data <- eth_usd_data %>%
+  mutate(Volatility = High - Low)
+
+volatility_plot <- ggplot(eth_usd_data, aes(x = Date, y = Volatility)) +
+  geom_line(color = "#9b59b6", size = 0.5, alpha = 0.7) +
+  geom_smooth(method = "loess", span = 0.1, color = "#3498db", fill = "#3498db", alpha = 0.2) +
+  labs(title = "Ethereum Daily Price Volatility",
+       x = "Date",
+       y = "Price Range (USD)") +
+  theme_minimal() +
+  scale_y_continuous(labels = comma)
+print(volatility_plot)
+```
+
+
+```{r}
+# Price comparison by year
+eth_usd_data$Year <- year(eth_usd_data$Date)
+eth_usd_data$DayOfYear <- yday(eth_usd_data$Date)
+
+
+yearly_plot <- ggplot(eth_usd_data, aes(x = DayOfYear, y = Close, color = factor(Year), group = Year)) +
+  geom_line(size = 0.8) +
+  labs(title = "Ethereum Price Comparison by Year",
+       x = "Month of the Year",
+       y = "Price (USD)",
+       color = "Year") +
+  theme_minimal() +
+  scale_y_continuous(labels = scales::comma) +
+  scale_x_continuous(breaks = seq(1, 365, by = 30),
+                     labels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+                                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan"))
+print(yearly_plot)
+
+# relationship between Price and Volume
+volume_price_plot <- ggplot(eth_usd_data, aes(x = Date)) +
+  geom_line(aes(y = Close), color = "#3498db", size = 0.8) +
+  geom_bar(aes(y = Volume/max(Volume)*max(Close)*0.8), stat = "identity", fill = "#34495e", alpha = 0.3) +
+  labs(title = "Ethereum Price V.S. Trading Volume",
+       x = "Date",
+       y = "Price (USD)") +
+  theme_minimal() +
+  scale_y_continuous(labels = comma, 
+                     sec.axis = sec_axis(~.*max(eth_usd_data$Volume)/(max(eth_usd_data$Close)*0.8), 
+                                         name = "Volume",
+                                         labels = comma))
+print(volume_price_plot)
+
+
+```
